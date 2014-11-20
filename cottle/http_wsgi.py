@@ -7,7 +7,9 @@
 ###############################################################################
 # HTTP and WSGI Tools ##########################################################
 ###############################################################################
-from comment import DictProperty, _hkey, _HTTP_STATUS_LINES
+from comment import DictProperty, _hkey, _HTTP_STATUS_LINES 
+from comment import FormsDict, HeaderDict
+from comment import _parse_qsl
 from Error import *
 from py23k import *
 class HeaderProperty(object):
@@ -682,6 +684,22 @@ class HTTPError(HTTPResponse):
         self.exception = exception
         self.traceback = traceback
         super(HTTPError, self).__init__(body, status, **options)
+
+def abort(code=500, text='Unknown Error.'):
+    """ Aborts execution and causes a HTTP error. """
+    raise HTTPError(code, text)
+
+
+def redirect(url, code=None):
+    """ Aborts execution and causes a 303 or 302 redirect, depending on
+        the HTTP protocol version. """
+    if not code:
+        code = 303 if request.get('SERVER_PROTOCOL') == "HTTP/1.1" else 302
+    res = response.copy(cls=HTTPResponse)
+    res.status = code
+    res.body = ""
+    res.set_header('Location', urljoin(request.url, url))
+    raise res
 
 
 if __name__ == "__main__":

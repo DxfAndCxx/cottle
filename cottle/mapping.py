@@ -3,9 +3,10 @@
 #    time      :   2014-11-20 10:53:13
 #    email     :   fengidri@yeah.net
 #    version   :   1.0.1
-from http_wsgi import HTTPError
+from http_wsgi import HTTPError, abort, redirect
 import re
 import types
+from template import template
 class Mapping(object):
     def load(self, urls, fvars):
         self.mapping = urls
@@ -50,7 +51,13 @@ class Mapping(object):
         chandle = cls()
 
         chandle.request = request
-        if hasattr(chandle, 'Before'):
+        chandle.query = request.query
+        chandle.forms = request.forms
+        chandle.path = request.path
+        chandle.env = request.environ
+        chandle.abort = abort
+        chandle.template = template
+        if hasattr(chandle, 'Before'):# 用户的定义了Before 方法
             if getattr(chandle, 'Before')():
                 res = getattr(chandle, meth)(*args)
             else:

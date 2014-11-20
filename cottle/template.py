@@ -7,8 +7,10 @@
 # Template Adapters ############################################################
 ###############################################################################
 from http_wsgi import  HTTPError
-from comment import html_quote, html_escape, cached_property
+from comment import html_quote, html_escape, cached_property, DEBUG
 from py23k import *
+TEMPLATE_PATH = ['./templates', './views/']
+TEMPLATES = {}
 
 class TemplateError(HTTPError):
     def __init__(self, message):
