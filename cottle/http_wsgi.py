@@ -121,6 +121,9 @@ class BaseRequest(object):
             encoded POST or PUT request body. The result is returned as a
             :class:`FormsDict`. All keys and values are strings. File uploads
             are stored separately in :attr:`files`. """
+        j = self.json
+        if j:
+            return j
         forms = FormsDict()
         for name, item in self.POST.allitems():
             if not isinstance(item, FileUpload):
@@ -157,6 +160,7 @@ class BaseRequest(object):
             smaller than :attr:`MEMFILE_MAX` are processed to avoid memory
             exhaustion. """
         ctype = self.environ.get('CONTENT_TYPE', '').lower().split(';')[0]
+        ctype = ctype.strip()
         if ctype == 'application/json':
             b = self._get_body_string()
             if not b:

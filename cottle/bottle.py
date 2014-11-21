@@ -742,6 +742,7 @@ class Bottle(object):
                     environ['bottle.route'] = route
                     environ['route.url_args'] = args
                     return route.call(**args)
+                
             finally:
                 self.trigger_hook('after_request')
         except HTTPResponse:

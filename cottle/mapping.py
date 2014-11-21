@@ -48,7 +48,7 @@ def attr_redirect(self, url, code=None):
     res.set_header('Location', urljoin(request.url, url))
     raise res
 
-
+################################################################################
 class Mapping(object):
     def load(self, mapping, fvars):
         self.mapping = []
@@ -125,6 +125,9 @@ class Mapping(object):
 
         if hasattr(handle, 'After'):
             getattr(handle, 'After')()
+
+        if not isinstance(res, basestring):
+            return json_dumps(res)
         return res
 
 if __name__ == "__main__":
