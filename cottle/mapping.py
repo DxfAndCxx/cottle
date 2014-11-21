@@ -3,29 +3,67 @@
 #    time      :   2014-11-20 10:53:13
 #    email     :   fengidri@yeah.net
 #    version   :   1.0.1
-from http_wsgi import HTTPError, abort, redirect
+from http_wsgi import HTTPError, HTTPResponse
 import re
 import types
-from template import template
+from template import template as template
+from py23k import *
+
+@property
+def attr_query(self):
+    return self.request.query
+ 
+@property
+def attr_forms(self):
+    return self.request.forms
+
+@property
+def attr_path(self):
+    return self.request.path
+
+@property
+def attr_env(self):
+    return self.request.environ
+
+def attr_template(self, *args, **kwargs):
+    return template(*args, **kwargs)
+
+def attr_abort(self, code=500, text='Unknown Error.'):
+    """ Aborts execution and causes a HTTP error. """
+    raise HTTPError(code, text)
+
+
+def attr_redirect(self, url, code=None):
+    """ Aborts execution and causes a 303 or 302 redirect, depending on
+        the HTTP protocol version. """
+    if not code:
+        if self.request.get('SERVER_PROTOCOL') == "HTTP/1.1": 
+            code = 303
+        else:
+            code = 302
+
+    res = response.copy(cls=HTTPResponse)
+    res.status = code
+    res.body = ""
+    res.set_header('Location', urljoin(request.url, url))
+    raise res
+
+
 class Mapping(object):
-    def load(self, urls, fvars):
-        self.mapping = urls
-        self.fvars = fvars
-    def match(self, path):
-        for pat, handle in self.mapping:
-            #暂时不支持application
-            #webpy中动态修改回调字符串的方式也不支持
-            pat = '^%s$' % pat
-            match = re.search(pat, path)
-            if match:
-                return handle, match.groups()
-        return None, []
-    def call(self, f, args,  request):
-            
-        if f is None:
-            raise HTTPError(404, "Not found")
-        elif isinstance(f, (types.ClassType, type)): # is_class
-            return self.handle_class(f, args, request)
+    def load(self, mapping, fvars):
+        self.mapping = []
+
+
+        for pat, handle in mapping:
+            handle = self.init_handle(handle, fvars)
+            if not handle: continue
+            self.mapping.append((pat, handle))
+
+    def init_handle(self, handle, fvars):
+        if handle is None:
+            return
+        elif isinstance(handle, (types.ClassType, type)): # is_class
+            return self.__init_handle(handle)
         elif isinstance(f, basestring):
             cls = None
             if '.' in f:
@@ -35,38 +73,58 @@ class Mapping(object):
             else:
                 cls = self.fvars.get(f)
             if cls:
-                return self.handle_class(cls, args, request)
-            raise HTTPError(404, "Not found: %s" % f)
-        elif hasattr(f, '__call__'):
-            return f(*args)
+                return self.__init_handle(cls)
+            return 
         else:
-            raise HTTPError(404, "Not found: %s" % f)
+            return
 
-    def handle_class(self, cls, args, request):
+    def __init_handle(self, cls):
+        setattr(cls, 'request',  None)
+        setattr(cls, 'response', None)
+        setattr(cls, 'query',    attr_query)
+        setattr(cls, 'forms',    attr_forms)
+        setattr(cls, 'path',     attr_path)
+        setattr(cls, 'env',      attr_env)
+        setattr(cls, 'template', attr_template)
+        setattr(cls, 'abort',    attr_abort)
+        setattr(cls, 'redirect', attr_redirect)
+        return cls()
+
+
+    def match(self, path):
+        for pat, handle in self.mapping:
+            #暂时不支持application
+            #webpy中动态修改回调字符串的方式也不支持
+            pat = '^%s$' % pat
+            match = re.search(pat, path)
+            if match:
+                return handle, match.groups()
+        return None, []
+
+    def call(self, handle, args, request, response):
+        if handle is None:
+            raise HTTPError(404, "Not Found")
+
         meth = request.method
-        if meth == 'HEAD' and not hasattr(cls, meth):
+        if meth == 'HEAD' and not hasattr(handle, meth):
             meth = 'GET'
-        if not hasattr(cls, meth):
+        if not hasattr(handle, meth):
             raise HTTPError(404, "Not Found Handle:%s" % meth)
-        chandle = cls()
 
-        chandle.request = request
-        chandle.query = request.query
-        chandle.forms = request.forms
-        chandle.path = request.path
-        chandle.env = request.environ
-        chandle.abort = abort
-        chandle.template = template
-        if hasattr(chandle, 'Before'):# 用户的定义了Before 方法
-            if getattr(chandle, 'Before')():
-                res = getattr(chandle, meth)(*args)
+
+        handle.request  = request
+        handle.response = response
+
+        if hasattr(handle, 'Before'):# 用户的定义了Before 方法
+            if getattr(handle, 'Before')():
+                res = getattr(handle, meth)(*args)
             else:
                 return ''#stop by Before. some Exception will be raise in Before
         else:
-            res = getattr(chandle, meth)(*args)
+            res = getattr(handle, meth)(*args)
 
-        if hasattr(chandle, 'After'):
-            getattr(chandle, 'After')()
+        if hasattr(handle, 'After'):
+            getattr(handle, 'After')()
         return res
 
 if __name__ == "__main__":

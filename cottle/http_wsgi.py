@@ -9,7 +9,7 @@
 ###############################################################################
 from comment import DictProperty, _hkey, _HTTP_STATUS_LINES 
 from comment import FormsDict, HeaderDict
-from comment import _parse_qsl
+from comment import _parse_qsl, cached_property
 from Error import *
 from py23k import *
 class HeaderProperty(object):
@@ -685,21 +685,67 @@ class HTTPError(HTTPResponse):
         self.traceback = traceback
         super(HTTPError, self).__init__(body, status, **options)
 
-def abort(code=500, text='Unknown Error.'):
-    """ Aborts execution and causes a HTTP error. """
-    raise HTTPError(code, text)
+class FileUpload(object):
 
+    def __init__(self, fileobj, name, filename, headers=None):
+        """ Wrapper for file uploads. """
+        #: Open file(-like) object (BytesIO buffer or temporary file)
+        self.file = fileobj
+        #: Name of the upload form field
+        self.name = name
+        #: Raw filename as sent by the client (may contain unsafe characters)
+        self.raw_filename = filename
+        #: A :class:`HeaderDict` with additional headers (e.g. content-type)
+        self.headers = HeaderDict(headers) if headers else HeaderDict()
 
-def redirect(url, code=None):
-    """ Aborts execution and causes a 303 or 302 redirect, depending on
-        the HTTP protocol version. """
-    if not code:
-        code = 303 if request.get('SERVER_PROTOCOL') == "HTTP/1.1" else 302
-    res = response.copy(cls=HTTPResponse)
-    res.status = code
-    res.body = ""
-    res.set_header('Location', urljoin(request.url, url))
-    raise res
+    content_type = HeaderProperty('Content-Type')
+    content_length = HeaderProperty('Content-Length', reader=int, default=-1)
+
+    @cached_property
+    def filename(self):
+        """ Name of the file on the client file system, but normalized to ensure
+            file system compatibility. An empty filename is returned as 'empty'.
+
+            Only ASCII letters, digits, dashes, underscores and dots are
+            allowed in the final filename. Accents are removed, if possible.
+            Whitespace is replaced by a single dash. Leading or tailing dots
+            or dashes are removed. The filename is limited to 255 characters.
+        """
+        fname = self.raw_filename
+        if not isinstance(fname, unicode):
+            fname = fname.decode('utf8', 'ignore')
+        fname = normalize('NFKD', fname).encode('ASCII', 'ignore').decode('ASCII')
+        fname = os.path.basename(fname.replace('\\', os.path.sep))
+        fname = re.sub(r'[^a-zA-Z0-9-_.\s]', '', fname).strip()
+        fname = re.sub(r'[-\s]+', '-', fname).strip('.-')
+        return fname[:255] or 'empty'
+
+    def _copy_file(self, fp, chunk_size=2**16):
+        read, write, offset = self.file.read, fp.write, self.file.tell()
+        while 1:
+            buf = read(chunk_size)
+            if not buf: break
+            write(buf)
+        self.file.seek(offset)
+
+    def save(self, destination, overwrite=False, chunk_size=2**16):
+        """ Save file to disk or copy its content to an open file(-like) object.
+            If *destination* is a directory, :attr:`filename` is added to the
+            path. Existing files are not overwritten by default (IOError).
+
+            :param destination: File path, directory or file(-like) object.
+            :param overwrite: If True, replace existing files. (default: False)
+            :param chunk_size: Bytes to read at a time. (default: 64kb)
+        """
+        if isinstance(destination, basestring): # Except file-likes here
+            if os.path.isdir(destination):
+                destination = os.path.join(destination, self.filename)
+            if not overwrite and os.path.exists(destination):
+                raise IOError('File exists.')
+            with open(destination, 'wb') as fp:
+                self._copy_file(fp, chunk_size)
+        else:
+            self._copy_file(destination, chunk_size)
 
 
 if __name__ == "__main__":

@@ -734,7 +734,7 @@ class Bottle(object):
                     environ['route.handle'] = handle
                     environ['bottle.route'] = handle
                     environ['route.url_args'] = args
-                    res  = self.mapping.call(handle, args, request)
+                    res  = self.mapping.call(handle, args, request, response)
                     return  res
                 else:
                     route, args = self.router.match(environ)
@@ -1144,67 +1144,6 @@ class ResourceManager(object):
         return self.opener(fname, mode=mode, *args, **kwargs)
 
 
-class FileUpload(object):
-
-    def __init__(self, fileobj, name, filename, headers=None):
-        """ Wrapper for file uploads. """
-        #: Open file(-like) object (BytesIO buffer or temporary file)
-        self.file = fileobj
-        #: Name of the upload form field
-        self.name = name
-        #: Raw filename as sent by the client (may contain unsafe characters)
-        self.raw_filename = filename
-        #: A :class:`HeaderDict` with additional headers (e.g. content-type)
-        self.headers = HeaderDict(headers) if headers else HeaderDict()
-
-    content_type = HeaderProperty('Content-Type')
-    content_length = HeaderProperty('Content-Length', reader=int, default=-1)
-
-    @cached_property
-    def filename(self):
-        """ Name of the file on the client file system, but normalized to ensure
-            file system compatibility. An empty filename is returned as 'empty'.
-
-            Only ASCII letters, digits, dashes, underscores and dots are
-            allowed in the final filename. Accents are removed, if possible.
-            Whitespace is replaced by a single dash. Leading or tailing dots
-            or dashes are removed. The filename is limited to 255 characters.
-        """
-        fname = self.raw_filename
-        if not isinstance(fname, unicode):
-            fname = fname.decode('utf8', 'ignore')
-        fname = normalize('NFKD', fname).encode('ASCII', 'ignore').decode('ASCII')
-        fname = os.path.basename(fname.replace('\\', os.path.sep))
-        fname = re.sub(r'[^a-zA-Z0-9-_.\s]', '', fname).strip()
-        fname = re.sub(r'[-\s]+', '-', fname).strip('.-')
-        return fname[:255] or 'empty'
-
-    def _copy_file(self, fp, chunk_size=2**16):
-        read, write, offset = self.file.read, fp.write, self.file.tell()
-        while 1:
-            buf = read(chunk_size)
-            if not buf: break
-            write(buf)
-        self.file.seek(offset)
-
-    def save(self, destination, overwrite=False, chunk_size=2**16):
-        """ Save file to disk or copy its content to an open file(-like) object.
-            If *destination* is a directory, :attr:`filename` is added to the
-            path. Existing files are not overwritten by default (IOError).
-
-            :param destination: File path, directory or file(-like) object.
-            :param overwrite: If True, replace existing files. (default: False)
-            :param chunk_size: Bytes to read at a time. (default: 64kb)
-        """
-        if isinstance(destination, basestring): # Except file-likes here
-            if os.path.isdir(destination):
-                destination = os.path.join(destination, self.filename)
-            if not overwrite and os.path.exists(destination):
-                raise IOError('File exists.')
-            with open(destination, 'wb') as fp:
-                self._copy_file(fp, chunk_size)
-        else:
-            self._copy_file(destination, chunk_size)
 
 
 
@@ -1462,25 +1401,25 @@ def auth_basic(check, realm="private", text="Access denied"):
 # Shortcuts for common Bottle methods.
 # They all refer to the current default application.
 
-def make_default_app_wrapper(name):
-    """ Return a callable that relays calls to the current default app. """
-    @functools.wraps(getattr(Bottle, name))
-    def wrapper(*a, **ka):
-        return getattr(app(), name)(*a, **ka)
-    return wrapper
-
-route     = make_default_app_wrapper('route')
-get       = make_default_app_wrapper('get')
-post      = make_default_app_wrapper('post')
-put       = make_default_app_wrapper('put')
-delete    = make_default_app_wrapper('delete')
-patch     = make_default_app_wrapper('patch')
-error     = make_default_app_wrapper('error')
-mount     = make_default_app_wrapper('mount')
-hook      = make_default_app_wrapper('hook')
-install   = make_default_app_wrapper('install')
-uninstall = make_default_app_wrapper('uninstall')
-url       = make_default_app_wrapper('get_url')
+#def make_default_app_wrapper(name):
+#    """ Return a callable that relays calls to the current default app. """
+#    @functools.wraps(getattr(Bottle, name))
+#    def wrapper(*a, **ka):
+#        return getattr(app(), name)(*a, **ka)
+#    return wrapper
+#
+#route     = make_default_app_wrapper('route')
+#get       = make_default_app_wrapper('get')
+#post      = make_default_app_wrapper('post')
+#put       = make_default_app_wrapper('put')
+#delete    = make_default_app_wrapper('delete')
+#patch     = make_default_app_wrapper('patch')
+#error     = make_default_app_wrapper('error')
+#mount     = make_default_app_wrapper('mount')
+#hook      = make_default_app_wrapper('hook')
+#install   = make_default_app_wrapper('install')
+#uninstall = make_default_app_wrapper('uninstall')
+#url       = make_default_app_wrapper('get_url')
 
 
 
