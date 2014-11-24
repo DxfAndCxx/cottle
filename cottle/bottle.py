@@ -1,21 +1,25 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
+Cottle is from Bottle. This frame more support restful.
+User can add self's app with plugin. And the plugin not need import module from 
+Cottle. Most methods will be add to the user's class.
+
 Bottle is a fast and simple micro-framework for small web applications. It
 offers request dispatching (Routes) with url parameter support, templates,
 a built-in HTTP Server and adapters for many third party WSGI/HTTP-server and
 template engines - all in a single file and with no dependencies other than the
 Python Standard Library.
 
-Homepage and documentation: http://bottlepy.org/
+Bottle's Homepage and documentation: http://bottlepy.org/
 
-Copyright (c) 2014, Marcel Hellkamp.
+Copyright (c) 2014, FengIdri.
 License: MIT (see LICENSE for details)
 """
 
 from __future__ import with_statement
 
-__author__ = 'Marcel Hellkamp'
+__author__ = 'FengIdri'
 __version__ = '0.13-dev'
 __license__ = 'MIT'
 
@@ -64,6 +68,7 @@ from http_wsgi import BaseResponse
 from http_wsgi import HTTPResponse 
 
 from http_wsgi import HTTPError
+from Error import * 
 
 
 
@@ -91,11 +96,6 @@ def makelist(data): # This is just too handy
     else:
         return []
 
-
-
-
-
-
 class lazy_attribute(object):
     """ A property that caches itself to the class object. """
     def __init__(self, func):
@@ -106,27 +106,6 @@ class lazy_attribute(object):
         value = self.getter(cls)
         setattr(cls, self.__name__, value)
         return value
-
-
-
-
-
-
-###############################################################################
-# Exceptions and Events ########################################################
-###############################################################################
-
-
-from Error import * 
-
-
-
-
-
-###############################################################################
-# Routing ######################################################################
-###############################################################################
-
 
 
 
@@ -472,6 +451,7 @@ class Bottle(object):
         self.router = Router() # Maps requests to :class:`Route` instances.
         self.error_handler = {}
         self.mapping = Mapping()  # mapping to handle call add by feng
+        self.root = 'static'
 
         # Core plugins
         self.plugins = [] # List of installed plugins.
@@ -735,13 +715,17 @@ class Bottle(object):
                     environ['bottle.route'] = handle
                     environ['route.url_args'] = args
                     res  = self.mapping.call(handle, args, request, response)
-                    return  res
+                    return res
                 else:
-                    route, args = self.router.match(environ)
-                    environ['route.handle'] = route
-                    environ['bottle.route'] = route
-                    environ['route.url_args'] = args
-                    return route.call(**args)
+                    return static_file(path, self.root)
+
+
+                #else:
+                #    route, args = self.router.match(environ)
+                #    environ['route.handle'] = route
+                #    environ['bottle.route'] = route
+                #    environ['route.url_args'] = args
+                #    return route.call(**args)
                 
             finally:
                 self.trigger_hook('after_request')
@@ -871,12 +855,6 @@ class Bottle(object):
 
 
 
-
-###############################################################################
-# HTTP and WSGI Tools ##########################################################
-###############################################################################
-
-
 def _local_property():
     ls = threading.local()
     def fget(_):
@@ -910,18 +888,6 @@ class LocalResponse(BaseResponse):
     _cookies     = _local_property()
     _headers     = _local_property()
     body         = _local_property()
-
-
-#Request = BaseRequest
-#Response = BaseResponse
-
-
-
-
-
-
-
-
 ###############################################################################
 # Plugins ######################################################################
 ###############################################################################
@@ -1003,13 +969,6 @@ class _ImportRedirect(object):
         setattr(self.module, modname, module)
         module.__loader__ = self
         return module
-
-
-
-
-
-
-
 
 
 
@@ -1399,41 +1358,7 @@ def auth_basic(check, realm="private", text="Access denied"):
     return decorator
 
 
-# Shortcuts for common Bottle methods.
-# They all refer to the current default application.
-
-#def make_default_app_wrapper(name):
-#    """ Return a callable that relays calls to the current default app. """
-#    @functools.wraps(getattr(Bottle, name))
-#    def wrapper(*a, **ka):
-#        return getattr(app(), name)(*a, **ka)
-#    return wrapper
-#
-#route     = make_default_app_wrapper('route')
-#get       = make_default_app_wrapper('get')
-#post      = make_default_app_wrapper('post')
-#put       = make_default_app_wrapper('put')
-#delete    = make_default_app_wrapper('delete')
-#patch     = make_default_app_wrapper('patch')
-#error     = make_default_app_wrapper('error')
-#mount     = make_default_app_wrapper('mount')
-#hook      = make_default_app_wrapper('hook')
-#install   = make_default_app_wrapper('install')
-#uninstall = make_default_app_wrapper('uninstall')
-#url       = make_default_app_wrapper('get_url')
-
-
-
-
-
-
-
-
 from adapter import server_names, ServerAdapter
-
-
-
-
 
 ###############################################################################
 # Application Control ##########################################################

@@ -9,6 +9,9 @@ import types
 from template import template as template
 from py23k import *
 
+
+# 用于增加到用户类的方法
+
 @property
 def attr_query(self):
     return self.request.query
@@ -127,6 +130,7 @@ class Mapping(object):
             getattr(handle, 'After')()
 
         if not isinstance(res, basestring):
+            response.content_type = "application/json"
             return json_dumps(res)
         return res
 
