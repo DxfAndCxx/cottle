@@ -45,10 +45,10 @@ def attr_redirect(self, url, code=None):
         else:
             code = 302
 
-    res = response.copy(cls=HTTPResponse)
+    res = self.response.copy(cls=HTTPResponse)
     res.status = code
     res.body = ""
-    res.set_header('Location', urljoin(request.url, url))
+    res.set_header('Location', urljoin(self.request.url, url))
     raise res
 
 ################################################################################
@@ -129,9 +129,13 @@ class Mapping(object):
         if hasattr(handle, 'After'):
             getattr(handle, 'After')()
 
+        
         if not isinstance(res, basestring):
             response.content_type = "application/json"
-            return json_dumps(res)
+            try:
+                return json_dumps(res)
+            except:
+                return res
         return res
 
 if __name__ == "__main__":

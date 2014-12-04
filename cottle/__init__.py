@@ -5,6 +5,7 @@
 #    version   :   1.0.1
 
 import bottle as cottle
+from bottle import static_file
 
 if __name__ == "__main__":
     pass

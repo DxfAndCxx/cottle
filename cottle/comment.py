@@ -357,7 +357,8 @@ def _parse_qsl(qs):
         r.append((key, value))
     return r
 
-DEBUG = False
+#DEBUG = False
+DEBUG = True 
 NORUN = False # If set, run() does nothing. Used by load_app()
 
 #: A dict to map HTTP status codes (e.g. 404) to phrases (e.g. 'Not Found')

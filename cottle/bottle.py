@@ -451,7 +451,7 @@ class Bottle(object):
         self.router = Router() # Maps requests to :class:`Route` instances.
         self.error_handler = {}
         self.mapping = Mapping()  # mapping to handle call add by feng
-        self.root = 'static'
+        self.root = ""
 
         # Core plugins
         self.plugins = [] # List of installed plugins.
@@ -464,6 +464,8 @@ class Bottle(object):
 
     __hook_names = 'before_request', 'after_request', 'app_reset', 'config'
     __hook_reversed = 'after_request'
+    def setroot(self, root='static'):
+        self.root = root
 
     @cached_property
     def _hooks(self):
@@ -717,7 +719,10 @@ class Bottle(object):
                     res  = self.mapping.call(handle, args, request, response)
                     return res
                 else:
-                    return static_file(path, self.root)
+                    if self.root:
+                        return static_file(path, self.root)
+                    else:
+                        raise HTTPError(404)
 
 
                 #else:
