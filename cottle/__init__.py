@@ -4,8 +4,11 @@
 #    email     :   fengidri@yeah.net
 #    version   :   1.0.1
 
-import bottle as cottle
-from bottle import static_file
+__all__ = ['handle', 'app']
+
+#import bottle as cottle
+from bottle import app
+from handle import handle
 
 if __name__ == "__main__":
     pass

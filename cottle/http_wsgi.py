@@ -594,6 +594,8 @@ class BaseResponse(object):
         reader=lambda x: datetime.utcfromtimestamp(parse_date(x)),
         writer=lambda x: http_date(x))
 
+
+
     @property
     def charset(self, default='UTF-8'):
         """ Return the charset specified in the content-type header (default: utf8). """
