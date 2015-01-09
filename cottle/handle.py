@@ -9,10 +9,15 @@ from template import template as template
 from py23k import *
 from bottle import static_file
 
+
+
 class handle(object):
     def __init__(self):
         self.request = None
         self.response = None
+        self.check_session = True # 是否进行session 检查
+        self.pam = None # 权限要求
+
     def Before(self):
         return True
     def After(self):

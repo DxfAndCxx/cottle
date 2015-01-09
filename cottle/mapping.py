@@ -7,6 +7,7 @@ from http_wsgi import HTTPError, HTTPResponse
 import re
 import types
 from py23k import *
+import session
 
 
 # 用于增加到用户类的方法
@@ -56,6 +57,22 @@ class Mapping(object):
             if match:
                 return handle, match.groups()
         return None, []
+    def session(self, handle, request, response):
+        if not handle.check_session:
+            handle.session = None 
+            return
+
+        ses = session.get_session(request)
+        if not ses:
+            ses = session.SessionCls()
+            if ses.login(request):
+                ses.save(response)
+            else:
+                raise HTTPError(401, "login error")
+        handle.session = ses 
+        #对会话权限进行检查. 
+        if handle.pam:
+            handle.session.check(handle.pam)
 
     def call(self, handle, args, request, response):
         if handle is None:
@@ -70,6 +87,7 @@ class Mapping(object):
 
         handle.request  = request
         handle.response = response
+        self.session(handle, request, response)
 
         if handle.Before():
             res = getattr(handle, meth)(*args)
