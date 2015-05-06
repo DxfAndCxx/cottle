@@ -7,7 +7,7 @@
 from http_wsgi import HTTPError, HTTPResponse
 from template import template as template
 from py23k import *
-from bottle import static_file
+from static import static_file
 
 
 
@@ -26,7 +26,7 @@ class handle(object):
     @property
     def query(self):
         return self.request.query
-    
+
     @property
     def forms(self):
         return self.request.forms
@@ -50,11 +50,11 @@ class handle(object):
         """ Aborts execution and causes a 303 or 302 redirect, depending on
             the HTTP protocol version. """
         if not code:
-            if self.request.get('SERVER_PROTOCOL') == "HTTP/1.1": 
+            if self.request.get('SERVER_PROTOCOL') == "HTTP/1.1":
                 code = 303
             else:
                 code = 302
-    
+
         res = self.response.copy(cls=HTTPResponse)
         res.status = code
         res.body = ""

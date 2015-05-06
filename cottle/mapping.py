@@ -16,50 +16,51 @@ import session
 
 ################################################################################
 class Mapping(object):
-    def load(self, mapping, fvars):
+    def load(self, mapping):
         self.mapping = []
 
-
         for pat, handle in mapping:
-            handle = self.init_handle(handle, fvars)
-            if not handle: continue
-            self.mapping.append((pat, handle))
+            pat = '^%s$' % pat
+            self.mapping.append((pat, handle()))
+            #handle = self.init_handle(handle, fvars)
+            #if not handle: continue
+            #self.mapping.append((pat, handle))
 
-    def init_handle(self, handle, fvars):
-        if handle is None:
-            return
-        elif isinstance(handle, (types.ClassType, type)): # is_class
-            return self.__init_handle(handle)
-        elif isinstance(f, basestring):
-            cls = None
-            if '.' in f:
-                mod, cls = f.rsplit('.', 1)
-                mod = __import__(mod, None, None, [''])
-                cls = getattr(mod, cls)
-            else:
-                cls = self.fvars.get(f)
-            if cls:
-                return self.__init_handle(cls)
-            return 
-        else:
-            return
+    #def init_handle(self, handle, fvars):
+    #    if handle is None:
+    #        return
+    #    elif isinstance(handle, (types.ClassType, type)): # is_class
+    #        return self.__init_handle(handle)
+    #    elif isinstance(f, basestring):
+    #        cls = None
+    #        if '.' in f:
+    #            mod, cls = f.rsplit('.', 1)
+    #            mod = __import__(mod, None, None, [''])
+    #            cls = getattr(mod, cls)
+    #        else:
+    #            cls = self.fvars.get(f)
+    #        if cls:
+    #            return self.__init_handle(cls)
+    #        return
+    #    else:
+    #        return
 
-    def __init_handle(self, cls):
-        return cls()
+    #def __init_handle(self, cls):
+    #    return cls()
 
 
     def match(self, path):
         for pat, handle in self.mapping:
             #暂时不支持application
             #webpy中动态修改回调字符串的方式也不支持
-            pat = '^%s$' % pat
             match = re.search(pat, path)
             if match:
                 return handle, match.groups()
         return None, []
+
     def session(self, handle, request, response):
         if not handle.check_session:
-            handle.session = None 
+            handle.session = None
             return
 
         ses = session.get_session(request)
@@ -69,8 +70,8 @@ class Mapping(object):
                 ses.save(response)
             else:
                 raise HTTPError(401, "login error")
-        handle.session = ses 
-        #对会话权限进行检查. 
+        handle.session = ses
+        #对会话权限进行检查.
         if handle.pam:
             handle.session.check(handle.pam)
 
@@ -94,7 +95,7 @@ class Mapping(object):
 
         handle.After()
 
-        
+
         if not isinstance(res, basestring):
             response.content_type = "application/json"
             try:

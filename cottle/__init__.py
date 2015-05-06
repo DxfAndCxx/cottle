@@ -7,7 +7,7 @@
 __all__ = ['handle', 'app']
 
 #import bottle as cottle
-from bottle import app
+from cottle import Cottle
 from handle import handle
 
 if __name__ == "__main__":

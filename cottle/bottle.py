@@ -1,49 +1,15 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-Cottle is from Bottle. This frame more support restful.
-User can add self's app with plugin. And the plugin not need import module from 
-Cottle. Most methods will be add to the user's class.
-
-Bottle is a fast and simple micro-framework for small web applications. It
-offers request dispatching (Routes) with url parameter support, templates,
-a built-in HTTP Server and adapters for many third party WSGI/HTTP-server and
-template engines - all in a single file and with no dependencies other than the
-Python Standard Library.
-
-Bottle's Homepage and documentation: http://bottlepy.org/
-
-Copyright (c) 2014, FengIdri.
-License: MIT (see LICENSE for details)
-"""
 
 from __future__ import with_statement
 
-__author__ = 'FengIdri'
 __version__ = '0.13-dev'
 __license__ = 'MIT'
 
 # The gevent and eventlet server adapters need to patch some modules before
 # they are imported. This is why we parse the commandline parameters here but
 # handle them later
-if __name__ == '__main__':
-    from optparse import OptionParser
-    _cmd_parser = OptionParser(usage="usage: %prog [options] package.module:app")
-    _opt = _cmd_parser.add_option
-    _opt("--version", action="store_true", help="show version number.")
-    _opt("-b", "--bind", metavar="ADDRESS", help="bind socket to ADDRESS.")
-    _opt("-s", "--server", default='wsgiref', help="use SERVER as backend.")
-    _opt("-p", "--plugin", action="append", help="install additional plugin/s.")
-    _opt("--debug", action="store_true", help="start server in debug mode.")
-    _opt("--reload", action="store_true", help="auto-reload on file changes.")
-    _cmd_options, _cmd_args = _cmd_parser.parse_args()
-    if _cmd_options.server:
-        if _cmd_options.server.startswith('gevent'):
-            import gevent.monkey; gevent.monkey.patch_all()
-        elif _cmd_options.server.startswith('eventlet'):
-            import eventlet; eventlet.monkey_patch()
 
-import base64, cgi, email.utils, functools, hmac, imp, itertools, mimetypes,\
+import base64, cgi, email.utils, functools, hmac, imp, itertools, \
         os, re, subprocess, sys, tempfile, threading, time, warnings
 
 from datetime import date as datedate, datetime, timedelta
@@ -59,16 +25,20 @@ from py23k import *
 from py23k import _stderr, _e#why
 from comment import html_quote, html_escape, cached_property,DictProperty
 from comment import ConfigDict, DEBUG
-from mapping import Mapping
 
 from http_wsgi import BaseRequest
-from http_wsgi import HeaderProperty 
+from http_wsgi import HeaderProperty
 from http_wsgi import _hkey
 from http_wsgi import BaseResponse
-from http_wsgi import HTTPResponse 
+from http_wsgi import HTTPResponse
+from http_wsgi import request
+from http_wsgi import response
 
 from http_wsgi import HTTPError
-from Error import * 
+from Error import *
+
+
+#---------------- cottle
 
 
 
@@ -450,8 +420,7 @@ class Bottle(object):
         self.routes = [] # List of installed :class:`Route` instances.
         self.router = Router() # Maps requests to :class:`Route` instances.
         self.error_handler = {}
-        self.mapping = Mapping()  # mapping to handle call add by feng
-        self.root = ""
+
 
         # Core plugins
         self.plugins = [] # List of installed plugins.
@@ -464,8 +433,6 @@ class Bottle(object):
 
     __hook_names = 'before_request', 'after_request', 'app_reset', 'config'
     __hook_reversed = 'after_request'
-    def setroot(self, root='static'):
-        self.root = root
 
     @cached_property
     def _hooks(self):
@@ -696,56 +663,6 @@ class Bottle(object):
     def default_error_handler(self, res):
         return tob(template(ERROR_PAGE_TEMPLATE, e=res))
 
-    def _handle(self, environ):
-        path = environ['bottle.raw_path'] = environ['PATH_INFO']
-        if py3k:
-            try:
-                environ['PATH_INFO'] = path.encode('latin1').decode('utf8')
-            except UnicodeError:
-                return HTTPError(400, 'Invalid path string. Expected UTF-8')
-
-        try:
-            environ['bottle.app'] = self
-            request.bind(environ)
-            response.bind()
-            try:
-                self.trigger_hook('before_request')
-
-                handle, args = self.mapping.match(path)
-                if handle:
-                    environ['route.handle'] = handle
-                    environ['bottle.route'] = handle
-                    environ['route.url_args'] = args
-                    res  = self.mapping.call(handle, args, request, response)
-                    return res
-                else:
-                    if self.root:
-                        return static_file(path, self.root)
-                    else:
-                        raise HTTPError(404)
-
-
-                #else:
-                #    route, args = self.router.match(environ)
-                #    environ['route.handle'] = route
-                #    environ['bottle.route'] = route
-                #    environ['route.url_args'] = args
-                #    return route.call(**args)
-                
-            finally:
-                self.trigger_hook('after_request')
-        except HTTPResponse:
-            return _e()
-        except RouteReset:
-            route.reset()
-            return self._handle(environ)
-        except (KeyboardInterrupt, SystemExit, MemoryError):
-            raise
-        except Exception:
-            if not self.catchall: raise
-            stacktrace = format_exc()
-            environ['wsgi.errors'].write(stacktrace)
-            return HTTPError(500, "Internal Server Error", _e(), stacktrace)
 
     def _cast(self, out, peek=None):
         """ Try to convert the parameter into something WSGI compatible and set
@@ -860,39 +777,6 @@ class Bottle(object):
 
 
 
-def _local_property():
-    ls = threading.local()
-    def fget(_):
-        try: return ls.var
-        except AttributeError:
-            raise RuntimeError("Request context not initialized.")
-    def fset(_, value): ls.var = value
-    def fdel(_): del ls.var
-    return property(fget, fset, fdel, 'Thread-local property')
-
-
-class LocalRequest(BaseRequest):
-    """ A thread-local subclass of :class:`BaseRequest` with a different
-        set of attributes for each thread. There is usually only one global
-        instance of this class (:data:`request`). If accessed during a
-        request/response cycle, this instance always refers to the *current*
-        request (even on a multithreaded server). """
-    bind = BaseRequest.__init__
-    environ = _local_property()
-
-
-class LocalResponse(BaseResponse):
-    """ A thread-local subclass of :class:`BaseResponse` with a different
-        set of attributes for each thread. There is usually only one global
-        instance of this class (:data:`response`). Its attributes are used
-        to build the HTTP response at the end of the request/response cycle.
-    """
-    bind = BaseResponse.__init__
-    _status_line = _local_property()
-    _status_code = _local_property()
-    _cookies     = _local_property()
-    _headers     = _local_property()
-    body         = _local_property()
 ###############################################################################
 # Plugins ######################################################################
 ###############################################################################
@@ -977,19 +861,19 @@ class _ImportRedirect(object):
 
 
 
-class AppStack(list):
-    """ A stack-like list. Calling it returns the head of the stack. """
-
-    def __call__(self):
-        """ Return the current default application. """
-        return self[-1]
-
-    def push(self, value=None):
-        """ Add a new :class:`Bottle` instance to the stack """
-        if not isinstance(value, Bottle):
-            value = Bottle()
-        self.append(value)
-        return value
+#class AppStack(list):
+#    """ A stack-like list. Calling it returns the head of the stack. """
+#
+#    def __call__(self):
+#        """ Return the current default application. """
+#        return self[-1]
+#
+#    def push(self, value=None):
+#        """ Add a new :class:`Bottle` instance to the stack """
+#        if not isinstance(value, Cottle):
+#            value = Cottle()
+#        self.append(value)
+#        return value
 
 
 class WSGIFileWrapper(object):
@@ -1130,78 +1014,6 @@ def _file_iter_range(fp, offset, bytes, maxread=1024*1024):
         if not part: break
         bytes -= len(part)
         yield part
-
-
-def static_file(filename, root, mimetype='auto', download=False, charset='UTF-8'):
-    """ Open a file in a safe way and return :exc:`HTTPResponse` with status
-        code 200, 305, 403 or 404. The ``Content-Type``, ``Content-Encoding``,
-        ``Content-Length`` and ``Last-Modified`` headers are set if possible.
-        Special support for ``If-Modified-Since``, ``Range`` and ``HEAD``
-        requests.
-
-        :param filename: Name or path of the file to send.
-        :param root: Root path for file lookups. Should be an absolute directory
-            path.
-        :param mimetype: Defines the content-type header (default: guess from
-            file extension)
-        :param download: If True, ask the browser to open a `Save as...` dialog
-            instead of opening the file with the associated program. You can
-            specify a custom filename as a string. If not specified, the
-            original filename is used (default: False).
-        :param charset: The charset to use for files with a ``text/*``
-            mime-type. (default: UTF-8)
-    """
-
-    root = os.path.abspath(root) + os.sep
-    filename = os.path.abspath(os.path.join(root, filename.strip('/\\')))
-    headers = dict()
-
-    if not filename.startswith(root):
-        return HTTPError(403, "Access denied.")
-    if not os.path.exists(filename) or not os.path.isfile(filename):
-        return HTTPError(404, "File does not exist.")
-    if not os.access(filename, os.R_OK):
-        return HTTPError(403, "You do not have permission to access this file.")
-
-    if mimetype == 'auto':
-        mimetype, encoding = mimetypes.guess_type(filename)
-        if encoding: headers['Content-Encoding'] = encoding
-
-    if mimetype:
-        if mimetype[:5] == 'text/' and charset and 'charset' not in mimetype:
-            mimetype += '; charset=%s' % charset
-        headers['Content-Type'] = mimetype
-
-    if download:
-        download = os.path.basename(filename if download == True else download)
-        headers['Content-Disposition'] = 'attachment; filename="%s"' % download
-
-    stats = os.stat(filename)
-    headers['Content-Length'] = clen = stats.st_size
-    lm = time.strftime("%a, %d %b %Y %H:%M:%S GMT", time.gmtime(stats.st_mtime))
-    headers['Last-Modified'] = lm
-
-    ims = request.environ.get('HTTP_IF_MODIFIED_SINCE')
-    if ims:
-        ims = parse_date(ims.split(";")[0].strip())
-    if ims is not None and ims >= int(stats.st_mtime):
-        headers['Date'] = time.strftime("%a, %d %b %Y %H:%M:%S GMT", time.gmtime())
-        return HTTPResponse(status=304, **headers)
-
-    body = '' if request.method == 'HEAD' else open(filename, 'rb')
-
-    headers["Accept-Ranges"] = "bytes"
-    ranges = request.environ.get('HTTP_RANGE')
-    if 'HTTP_RANGE' in request.environ:
-        ranges = list(parse_range_header(request.environ['HTTP_RANGE'], clen))
-        if not ranges:
-            return HTTPError(416, "Requested Range Not Satisfiable")
-        offset, end = ranges[0]
-        headers["Content-Range"] = "bytes %d-%d/%d" % (offset, end-1, clen)
-        headers["Content-Length"] = str(end-offset)
-        if body: body = _file_iter_range(body, offset, end-offset)
-        return HTTPResponse(body, status=206, **headers)
-    return HTTPResponse(body, **headers)
 
 
 
@@ -1595,48 +1407,18 @@ ERROR_PAGE_TEMPLATE = """
 %%end
 """ % __name__
 
-#: A thread-safe instance of :class:`LocalRequest`. If accessed from within a
-#: request callback, this instance always refers to the *current* request
-#: (even on a multithreaded server).
-request = LocalRequest()
-
-#: A thread-safe instance of :class:`LocalResponse`. It is used to change the
-#: HTTP response for the *current* request.
-response = LocalResponse()
 
 #: A thread-safe namespace. Not used by Bottle.
 local = threading.local()
 
 # Initialize app stack (create first empty Bottle app)
 # BC: 0.6.4 and needed for run()
-app = default_app = AppStack()
-app.push()
+#app = default_app = AppStack()
+#app.push()
 
 #: A virtual package that redirects import statements.
 #: Example: ``import bottle.ext.sqlite`` actually imports `bottle_sqlite`.
 ext = _ImportRedirect('bottle.ext' if __name__ == '__main__' else __name__+".ext", 'bottle_%s').module
-
-if __name__ == '__main__':
-    opt, args, parser = _cmd_options, _cmd_args, _cmd_parser
-    if opt.version:
-        _stdout('Bottle %s\n'%__version__)
-        sys.exit(0)
-    if not args:
-        parser.print_help()
-        _stderr('\nError: No application entry point specified.\n')
-        sys.exit(1)
-
-    sys.path.insert(0, '.')
-    sys.modules.setdefault('bottle', sys.modules['__main__'])
-
-    host, port = (opt.bind or 'localhost'), 8080
-    if ':' in host and host.rfind(']') < host.rfind(':'):
-        host, port = host.rsplit(':', 1)
-    host = host.strip('[]')
-
-    run(args[0], host=host, port=int(port), server=opt.server,
-        reloader=opt.reload, plugins=opt.plugin, debug=opt.debug)
-
 
 
 

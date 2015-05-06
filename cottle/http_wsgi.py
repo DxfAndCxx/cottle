@@ -12,6 +12,7 @@ from comment import FormsDict, HeaderDict
 from comment import _parse_qsl, cached_property
 from Error import *
 from py23k import *
+import threading
 class HeaderProperty(object):
     def __init__(self, name, reader=None, writer=str, default=''):
         self.name, self.default = name, default
@@ -753,6 +754,48 @@ class FileUpload(object):
         else:
             self._copy_file(destination, chunk_size)
 
+def _local_property():
+    ls = threading.local()
+    def fget(_):
+        try: return ls.var
+        except AttributeError:
+            raise RuntimeError("Request context not initialized.")
+    def fset(_, value): ls.var = value
+    def fdel(_): del ls.var
+    return property(fget, fset, fdel, 'Thread-local property')
+
+
+class LocalRequest(BaseRequest):
+    """ A thread-local subclass of :class:`BaseRequest` with a different
+        set of attributes for each thread. There is usually only one global
+        instance of this class (:data:`request`). If accessed during a
+        request/response cycle, this instance always refers to the *current*
+        request (even on a multithreaded server). """
+    bind = BaseRequest.__init__
+    environ = _local_property()
+
+
+class LocalResponse(BaseResponse):
+    """ A thread-local subclass of :class:`BaseResponse` with a different
+        set of attributes for each thread. There is usually only one global
+        instance of this class (:data:`response`). Its attributes are used
+        to build the HTTP response at the end of the request/response cycle.
+    """
+    bind = BaseResponse.__init__
+    _status_line = _local_property()
+    _status_code = _local_property()
+    _cookies     = _local_property()
+    _headers     = _local_property()
+    body         = _local_property()
+
+#: A thread-safe instance of :class:`LocalRequest`. If accessed from within a
+#: request callback, this instance always refers to the *current* request
+#: (even on a multithreaded server).
+request = LocalRequest()
+
+#: A thread-safe instance of :class:`LocalResponse`. It is used to change the
+#: HTTP response for the *current* request.
+response = LocalResponse()
 
 if __name__ == "__main__":
     pass
