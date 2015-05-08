@@ -39,6 +39,9 @@ class handle(object):
     def env(self):
         return self.request.environ
 
+    def getcookie(self, key, default=None, secret=None):
+        return self.request.get_cookie(key)
+
     def template(self, *args, **kwargs):
         return template(*args, **kwargs)
 

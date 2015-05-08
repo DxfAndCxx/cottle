@@ -86,15 +86,15 @@ class Mapping(object):
             raise HTTPError(404, "Not Found Handle:%s" % meth)
 
 
+        handle.params = args
         handle.request  = request
         handle.response = response
         self.session(handle, request, response)
 
         if handle.Before():
-            res = getattr(handle, meth)(*args)
+            res = getattr(handle, meth)()
 
         handle.After()
-
 
         if not isinstance(res, basestring):
             response.content_type = "application/json"

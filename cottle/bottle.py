@@ -1041,13 +1041,6 @@ def http_date(value):
         value = time.strftime("%a, %d %b %Y %H:%M:%S GMT", value)
     return value
 
-def parse_date(ims):
-    """ Parse rfc1123, rfc850 and asctime timestamps and return UTC epoch. """
-    try:
-        ts = email.utils.parsedate_tz(ims)
-        return time.mktime(ts[:8] + (0,)) - (ts[9] or 0) - time.timezone
-    except (TypeError, ValueError, IndexError, OverflowError):
-        return None
 
 def parse_auth(header):
     """ Parse rfc2617 HTTP authentication header string (basic) and return (user,pass) tuple or None"""
@@ -1084,26 +1077,6 @@ def _lscmp(a, b):
     return not sum(0 if x==y else 1 for x, y in zip(a, b)) and len(a) == len(b)
 
 
-def cookie_encode(data, key):
-    """ Encode and sign a pickle-able object. Return a (byte) string """
-    msg = base64.b64encode(pickle.dumps(data, -1))
-    sig = base64.b64encode(hmac.new(tob(key), msg).digest())
-    return tob('!') + sig + tob('?') + msg
-
-
-def cookie_decode(data, key):
-    """ Verify and decode an encoded string. Return an object or None."""
-    data = tob(data)
-    if cookie_is_encoded(data):
-        sig, msg = data.split(tob('?'), 1)
-        if _lscmp(sig[1:], base64.b64encode(hmac.new(tob(key), msg).digest())):
-            return pickle.loads(base64.b64decode(msg))
-    return None
-
-
-def cookie_is_encoded(data):
-    """ Return True if the argument looks like a encoded cookie."""
-    return bool(data.startswith(tob('!')) and tob('?') in data)
 
 
 

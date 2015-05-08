@@ -7,12 +7,34 @@
 ###############################################################################
 # HTTP and WSGI Tools ##########################################################
 ###############################################################################
-from comment import DictProperty, _hkey, _HTTP_STATUS_LINES 
+from comment import DictProperty, _hkey, _HTTP_STATUS_LINES
 from comment import FormsDict, HeaderDict
 from comment import _parse_qsl, cached_property
 from Error import *
 from py23k import *
 import threading
+import urllib
+
+def cookie_encode(data, key):
+    """ Encode and sign a pickle-able object. Return a (byte) string """
+    msg = base64.b64encode(pickle.dumps(data, -1))
+    sig = base64.b64encode(hmac.new(tob(key), msg).digest())
+    return tob('!') + sig + tob('?') + msg
+
+
+def cookie_decode(data, key):
+    """ Verify and decode an encoded string. Return an object or None."""
+    data = tob(data)
+    if cookie_is_encoded(data):
+        sig, msg = data.split(tob('?'), 1)
+        if _lscmp(sig[1:], base64.b64encode(hmac.new(tob(key), msg).digest())):
+            return pickle.loads(base64.b64decode(msg))
+    return None
+
+
+def cookie_is_encoded(data):
+    """ Return True if the argument looks like a encoded cookie."""
+    return bool(data.startswith(tob('!')) and tob('?') in data)
 class HeaderProperty(object):
     def __init__(self, name, reader=None, writer=str, default=''):
         self.name, self.default = name, default
@@ -99,6 +121,8 @@ class BaseRequest(object):
             :meth:`BaseResponse.set_cookie`). If anything goes wrong (missing
             cookie or wrong signature), return a default value. """
         value = self.cookies.get(key)
+        if value:
+            value = urllib.unquote(value)
         if secret and value:
             dec = cookie_decode(value, secret) # (key, value) tuple or None
             return dec[1] if dec and dec[0] == key else default
@@ -204,7 +228,7 @@ class BaseRequest(object):
                 maxread -= len(part)
             if read(2) != rn:
                 raise err
-            
+
     @DictProperty('environ', 'bottle.request.body', read_only=True)
     def _body(self):
         body_iter = self._iter_chunked if self.chunked else self._iter_body

@@ -6,12 +6,20 @@
 import os
 import mimetypes
 import time
+import email
 from http_wsgi import HTTPResponse
 
 from http_wsgi import HTTPError
 from http_wsgi import request
 from http_wsgi import response
 
+def parse_date(ims):
+    """ Parse rfc1123, rfc850 and asctime timestamps and return UTC epoch. """
+    try:
+        ts = email.utils.parsedate_tz(ims)
+        return time.mktime(ts[:8] + (0,)) - (ts[9] or 0) - time.timezone
+    except (TypeError, ValueError, IndexError, OverflowError):
+        return None
 
 def static_file(filename, root, mimetype='auto', download=False, charset='UTF-8'):
     """ Open a file in a safe way and return :exc:`HTTPResponse` with status
