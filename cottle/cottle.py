@@ -46,7 +46,7 @@ class Cottle(Bottle):
 
 
     def load_plugin(self):
-        ps = plugins.load(self.plugins_path, 'name', 'urls')
+        ps = plugins.load(self.plugins_path)
         for mode, name, urls in ps.values():
             self.mode_init(mode, name, urls)
 
