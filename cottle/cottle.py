@@ -20,6 +20,7 @@ from static import static_file
 # http
 from http_wsgi import HTTPResponse
 from traceback import format_exc, print_exc
+
 class Cottle(Bottle):
     plugins_path = 'plugin'
     URLS = []
@@ -31,6 +32,9 @@ class Cottle(Bottle):
         self.pre_static = opts.get('pre_static') or "/static"
         self.path_static = opts.get('path_static') or ''
         self.plugins_path = opts.get('plugin')
+
+
+        logging.info('**************** start cottle ******************')
 
         self.load_plugin()
         self.logurls()
@@ -73,8 +77,10 @@ class Cottle(Bottle):
             if len(u) > l:
                 l = len(u)
 
+        lines = ['']
         for u,c in self.URLS:
-            logging.info("%s   ===>    %s" % (u.ljust(l),c))
+            lines.append("%s  ===>  %s" % (u.ljust(l),c))
+        logging.info('\n'.join(lines))
 
     def _handle(self, environ):
         path = environ['bottle.raw_path'] = environ['PATH_INFO']
@@ -85,7 +91,6 @@ class Cottle(Bottle):
             response.bind()
 
 
-            logging.error(path + self.pre_static)
 
             if self.path_static and path.startswith(self.pre_static):
                 path = path[len(self.pre_static):]
@@ -113,6 +118,14 @@ class Cottle(Bottle):
             stacktrace = format_exc()
             environ['wsgi.errors'].write(stacktrace)
             return HTTPError(500, "Internal Server Error", _e(), stacktrace)
+
+    def run(self, config = None):
+        from ctrl import run
+        if not config:
+            from config import config
+            config = config()
+
+        run(self, config)
 
 
 

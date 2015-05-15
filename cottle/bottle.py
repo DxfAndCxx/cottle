@@ -1175,18 +1175,6 @@ def load(target, **namespace):
     return eval('%s.%s' % (module, target), namespace)
 
 
-def load_app(target):
-    """ Load a bottle application from a module and make sure that the import
-        does not affect the current default application, but returns a separate
-        application object. See :func:`load` for the target parameter. """
-    global NORUN; NORUN, nr_old = True, NORUN
-    tmp = default_app.push() # Create a new "default application"
-    try:
-        rv = load(target) # Import the target module
-        return rv if callable(rv) else tmp
-    finally:
-        default_app.remove(tmp) # Remove the temporary added default application
-        NORUN = nr_old
 
 _debug = debug
 def run(app=None, server='wsgiref', host='127.0.0.1', port=8080,
@@ -1208,7 +1196,6 @@ def run(app=None, server='wsgiref', host='127.0.0.1', port=8080,
         :param quiet: Suppress output to stdout and stderr? (default: False)
         :param options: Options passed to the server adapter.
      """
-    if NORUN: return
     if reloader and not os.environ.get('BOTTLE_CHILD'):
         lockfile = None
         try:
