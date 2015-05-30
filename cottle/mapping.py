@@ -93,16 +93,15 @@ class Mapping(object):
 
         if handle.Before():
             res = getattr(handle, meth)()
+            handle.After()
+            if not isinstance(res, basestring):
+                response.content_type = "application/json"
+                try:
+                    return json_dumps(res)
+                except:
+                    return res
 
-        handle.After()
-
-        if not isinstance(res, basestring):
-            response.content_type = "application/json"
-            try:
-                return json_dumps(res)
-            except:
-                return res
-        return res
+        handle.abort(500, 'Stop in Before')
 
 if __name__ == "__main__":
     pass
